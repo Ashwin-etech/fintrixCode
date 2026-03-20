@@ -1,16 +1,34 @@
 'use server';
 
-import {auth} from "@/lib/better-auth/auth";
-import {inngest} from "@/lib/inngest/client";
-import {headers} from "next/headers";
+import { auth } from "@/lib/better-auth/auth";
+import { inngest } from "@/lib/inngest/client";
+import { headers } from "next/headers";
 import { isAdminEmail } from "@/lib/admin";
 import { connectToDatabase } from "@/database/mongoose";
+
+export const checkUserExists = async (email: string) => {
+    try {
+        const mongoose = await connectToDatabase();
+        const db = mongoose.connection.db;
+
+        if (!db) return { exists: false };
+
+        const user = await db.collection('user').findOne({
+            email: email.trim().toLowerCase()
+        });
+
+        return { exists: !!user };
+    } catch (e) {
+        console.log('Check user exists failed', e);
+        return { exists: false };
+    }
+}
 
 export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData) => {
     try {
         const response = await auth.api.signUpEmail({ body: { email, password, name: fullName } })
 
-        if(response) {
+        if (response) {
             // Persist the extra onboarding fields on the user document
             const mongoose = await connectToDatabase();
             const db = mongoose.connection.db;
@@ -28,9 +46,20 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
         }
 
         return { success: true, data: response }
-    } catch (e) {
+    } catch (e: any) {
         console.log('Sign up failed', e)
-        return { success: false, error: 'Sign up failed' }
+
+        // Handle specific error cases
+        if (e?.body?.message === 'User already exists' ||
+            e?.message?.includes('User already exists') ||
+            e?.status === 'UNPROCESSABLE_ENTITY') {
+            return {
+                success: false,
+                error: 'An account with this email already exists. Please sign in or use a different email.'
+            }
+        }
+
+        return { success: false, error: e instanceof Error ? e.message : 'Sign up failed' }
     }
 }
 

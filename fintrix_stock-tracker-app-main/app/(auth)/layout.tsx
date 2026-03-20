@@ -10,16 +10,23 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
 
     if (session?.user) redirect('/');
 
+    // Check if current page is sign-up by checking the URL
+    const headersList = await headers();
+    const url = headersList.get('x-url') || '';
+    const isSignUpPage = url.includes('/sign-up');
+
     return (
         <main className="auth-layout">
-            <section className="auth-left-section scrollbar-hide-default">
+            {/* Form Section - Always visible */}
+            <section className="auth-left-section">
                 <Link href="/" className="auth-logo">
                     <Image src="/assets/icons/logo.svg" alt="Signalist logo" width={140} height={32} className='h-8 w-auto' />
                 </Link>
                 <div className="pb-6 lg:pb-8 flex-1">{children}</div>
             </section>
 
-            <section className="auth-right-section relative flex flex-col min-h-screen h-screen max-h-screen justify-center items-center pb-8 overflow-y-auto">
+            {/* Branding Section - Hidden on mobile for sign-up, visible for sign-in */}
+            <section className={`auth-right-section ${isSignUpPage ? 'signup-mobile-hidden' : ''} relative flex flex-col justify-center items-center overflow-y-auto`}>
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-yellow-500/5 via-transparent to-purple-500/10" />
 
                 <div className="relative flex flex-col w-full items-center justify-center flex-1 gap-12 py-16 px-4 md:px-10 lg:px-16">

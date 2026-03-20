@@ -1,8 +1,9 @@
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useState, useCallback } from 'react';
 import useTradingViewWidget from "@/hooks/useTradingViewWidget";
-import {cn} from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import TradingViewWidgetFallback from "./TradingViewWidgetFallback";
 
 interface TradingViewWidgetProps {
     title?: string;
@@ -13,7 +14,51 @@ interface TradingViewWidgetProps {
 }
 
 const TradingViewWidget = ({ title, scriptUrl, config, height = 600, className }: TradingViewWidgetProps) => {
+    const [hasError, setHasError] = useState(false);
     const containerRef = useTradingViewWidget(scriptUrl, config, height);
+
+    const handleRetry = useCallback(() => {
+        setHasError(false);
+        // Force re-render by clearing the container
+        if (containerRef.current) {
+            containerRef.current.innerHTML = '';
+            delete containerRef.current.dataset.loaded;
+        }
+    }, [containerRef]);
+
+    // Monitor for specific TradingView widget errors
+    React.useEffect(() => {
+        const handleError = (event: ErrorEvent) => {
+            if (event.message && event.message.includes('Failed to load TradingView widget:')) {
+                setHasError(true);
+            }
+        };
+
+        const handleRejection = (event: PromiseRejectionEvent) => {
+            if (event.reason && event.reason.toString().includes('Failed to load TradingView widget:')) {
+                setHasError(true);
+            }
+        };
+
+        window.addEventListener('error', handleError);
+        window.addEventListener('unhandledrejection', handleRejection);
+
+        return () => {
+            window.removeEventListener('error', handleError);
+            window.removeEventListener('unhandledrejection', handleRejection);
+        };
+    }, []);
+
+    if (hasError) {
+        return (
+            <TradingViewWidgetFallback
+                title={title}
+                height={height}
+                onRetry={handleRetry}
+                className={className}
+            />
+        );
+    }
 
     return (
         <div className="w-full">
